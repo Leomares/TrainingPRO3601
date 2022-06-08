@@ -3,6 +3,8 @@
 Crimes := $.File_crime_optimized.File;
 LayoutCrimes := $.File_crime_optimized.NewLayout;
 
+OUTPUT(Crimes,NAMED('Crimes'));
+
 //Dados totais de local
 //LayoutAddress := RECORD
 //	 UNSIGNED row_id;
@@ -21,7 +23,6 @@ LayoutCrimes := $.File_crime_optimized.NewLayout;
 //END;
 
 //Tratamento de enderecos
-
 
 Address := RECORD
   Crimes.district; 
@@ -44,16 +45,29 @@ END;
 AddressTable := TABLE(Crimes, Address);
 
 CrimeAddress := PROJECT(
-  DEDUP(AddressTable,ALL), 
+  AddressTable, 
 	CrimeAddressFormat(LEFT,COUNTER)
  );
 
-OUTPUT(CrimeAddress,NAMED('Locais'));
+Address_ID duplicate(Address_ID Le, Address_ID Ri) := TRANSFORM
+  SELF.row_id := IF(Ri.row_id <= Le.row_id,Ri.row_id,Le.row_id);
+  SELF := Le;
+END;
+
+CrimeAddress_dup := ROLLUP(
+  CrimeAddress,
+  LEFT.district = RIGHT.district AND
+  LEFT.community_area = RIGHT.community_area AND 
+  LEFT.block = RIGHT.block,
+  duplicate(LEFT,RIGHT)
+);
+
+OUTPUT(CrimeAddress_dup,NAMED('Locais'));
 
 //Tratamento de crimes
 
 CrimeData := RECORD
-    UNSIGNED row_id;
+    UNSIGNED add_id;
     UNSIGNED date;
     STRING time;
 		UNSIGNED4 id;
@@ -68,12 +82,29 @@ CrimeData := RECORD
     STRING22 updated_on;
 END;
 
-CrimeData addressCode(LayoutCrimes Le, UNSIGNED code) := TRANSFORM
-  SELF.row_id := code;
-  SELF.Le;
+CrimeData AddID(LayoutCrimes Le, CrimeAddress A):= TRANSFORM
+  SELF.date := STD.Date.FromStringToDate(Le.date[1..10], '%m/%d/%Y');
+  SELF.time := 
+      IF(Le.date[21..22] = 'PM' AND (UNSIGNED1)Le.date[12..13] < 12,
+        (STRING2)((UNSIGNED1)Le.date[12..13]+ 12),
+        Le.date[12..13])+
+      Le.date[15..16]+
+      Le.date[18..19];
+  SELF := Le;
+  SELF.add_id := A.row_id;
 END;
 
-CrimeData_ID := PROJECT(
-  //ROLLUP
+//normalizacao dos enderecos nos dados de crimes
+ 
 
-);
+Crime_withID := JOIN(
+    Crimes, CrimeAddress, 
+    LEFT.district = RIGHT.district AND
+    LEFT.community_area = RIGHT.community_area AND 
+    LEFT.block = RIGHT.block,
+    AddID(LEFT,RIGHT),
+    LEFT OUTER,
+    LOOKUP
+  );
+
+OUTPUT(Crime_withID,NAMED('Normalizado'));
