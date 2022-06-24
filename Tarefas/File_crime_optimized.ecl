@@ -24,4 +24,5 @@
         STRING29 location;
     END;
     EXPORT File:=DATASET('~class::intro::lmp::crimes',NewLayout,CSV(heading(1)));
+    EXPORT Index_file := INDEX(File,{block},'~class::lmp::crime_index');
 END;

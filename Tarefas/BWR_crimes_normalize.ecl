@@ -98,7 +98,7 @@ END;
  
 
 Crime_withID := JOIN(
-    Crimes, CrimeAddress, 
+    Crimes, CrimeAddress_dup, 
     LEFT.district = RIGHT.district AND
     LEFT.community_area = RIGHT.community_area AND 
     LEFT.block = RIGHT.block,
